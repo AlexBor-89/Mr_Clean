@@ -1,9 +1,6 @@
 [FOLDERS]
 .venv
-build
-dist
 LOGS
 TEST
 
 [FILES]
-main.spec
