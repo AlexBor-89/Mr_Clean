@@ -1,19 +1,23 @@
 # encoding = utf-8
 
-import os
-import wx
-import sys
-import time
-import shutil
-import fnmatch
-import logging
-import datetime
-import platform
-import threading
-import configparser
-from pathlib import Path
-from pystray import Icon, Menu, MenuItem
-from PIL import Image
+# Стандартные библиотеки Python
+import os  # Используется для работы с операционной системой, файловой системой и путями.
+import wx  # Библиотека для создания графического интерфейса пользователя (GUI).
+import sys  # Предоставляет доступ к некоторым переменным и функциям, взаимодействующим с интерпретатором Python.
+import time  # Модуль для работы со временем, включая задержки и измерение времени.
+# import ctypes  # Модуль, который позволяет вызывать функции из динамически загружаемых библиотек (DLL на Windows, .so на Linux).
+import shutil  # Предназначен для высокого уровня операций с файлами и каталогами, таких как копирование, удаление и перемещение.
+import fnmatch  # Модуль для сравнения строк с шаблонами UNIX-стиля (*, ?, [seq], [!seq]).
+import logging  # Стандартный модуль для логирования событий программы.
+import datetime  # Модуль для работы с датой и временем.
+import platform  # Модуль для определения информации об операционной системе.
+import threading  # Модуль для работы с потоками выполнения.
+import configparser  # Модуль для чтения и записи конфигурационных файлов.
+from pathlib import Path  # Объектно-ориентированный подход к работе с путями файловой системы.
+
+# Внешние библиотеки
+from pystray import Icon, Menu, MenuItem  # Библиотека для создания иконок в системном трее.
+from PIL import Image  # Библиотека для обработки изображений.
 
 
 
@@ -26,14 +30,12 @@ def resource_path(relative_path, is_output_dir=False):
                           Если False, возвращает путь к временной директории _MEIPASS.
     """
     try:
-        # Если программа запущена как .exe (PyInstaller)
-        if hasattr(sys, "_MEIPASS"):
+        if hasattr(sys, "_MEIPASS"):  # Если программа запущена как .exe (PyInstaller)
             if is_output_dir:
                 base_path = Path(os.path.dirname(sys.executable))  # Директория .exe
             else:
                 base_path = Path(sys._MEIPASS)  # Временная директория
-        else:
-            # Если программа запущена как скрипт
+        else:  # Если программа запущена как скрипт
             base_path = Path(os.path.abspath(__file__)).parent  # Директория скрипта
 
         return os.path.join(base_path, relative_path)
@@ -43,6 +45,9 @@ def resource_path(relative_path, is_output_dir=False):
 
 
 def get_days_ending(number):
+    """
+    Определение правильного склонения слова "день" в зависимости от переданного числа.
+    """
     if number % 100 in [11, 12, 13, 14]:  # Обработка исключений для чисел 11-14
         return "дней"
     elif number % 10 == 1:  # Числа, заканчивающиеся на 1 (кроме 11)
@@ -59,7 +64,7 @@ class Mr_Clean:
         Инициализация программы.
         """
         self.PROGRAM_NAME = "Mr. Clean"
-        self.PROGRAM_VERSION = "1.2"
+        self.PROGRAM_VERSION = "1.3"
 
         # Временный базовый логгер
         logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -70,8 +75,11 @@ class Mr_Clean:
             self.create_default_configs()  # Создание файлов конфигурации, если они отсутствуют
 
             # Загрузка конфигураций
-            self.config = self.load_config("config.cfg")
-            self.values_config = self.load_config("values.ini")
+            config_file = resource_path("config.cfg", is_output_dir=True)
+            values_file = resource_path("values.ini", is_output_dir=True)
+
+            self.config = self.load_config(config_file)
+            self.values_config = self.load_config(values_file)
 
             # Инициализация параметров
             self.cycle_time_limit_sec = int(self.config["SETTINGS"]["cycle-time-limit-sec"])
@@ -84,9 +92,9 @@ class Mr_Clean:
             self.main_window = MainWindow(
                 None,
                 title=f"{self.PROGRAM_NAME} v{self.PROGRAM_VERSION}",
-                log_level=self.log_level  # Передаем уровень логирования
+                log_level=self.log_level,  # Передаем уровень логирования
+                mr_clean_instance=self  # Передаем ссылку на себя
             )
-            #self.main_window.Show(False)  # Сначала скрываем окно
 
             self.setup_logging()  # Настройка основного логгера
             self.icon = self.tray_start_mr_clean()  # Создание иконки в системном трее
@@ -107,8 +115,7 @@ class Mr_Clean:
         self.logger.debug(f"Загрузка конфигурации из файла: {config_file}")
         config = configparser.ConfigParser()
 
-        # Проверяем, существует ли файл
-        if not Path(config_file).exists():
+        if not Path(config_file).exists():  # Проверяем, существует ли файл
             self.logger.error(f"Файл {config_file} не найден.")
             raise FileNotFoundError(f"Файл {config_file} не найден.")
 
@@ -122,18 +129,18 @@ class Mr_Clean:
         Настройка логирования.
         """
         if self.logging_enabled:
-            # Очистка существующих обработчиков логгера
-            logging.getLogger().handlers.clear()
-
             # Использование resource_path для определения базовой директории для логов
             base_path = Path(resource_path(".", is_output_dir=True))
             log_folder = base_path / "LOGS"
             
             if not log_folder.exists():
-                self.logger.warning(f"Папка LOGS не найдена. Создание папки {log_folder}.")
+                logging.warning(f"Каталог LOGS не найден. Создание каталога: {log_folder}.")
                 log_folder.mkdir(exist_ok=True)
 
             log_file = log_folder / f"Mr. Clean {datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')}.log"
+
+            # Очистка существующих обработчиков логгера
+            logging.getLogger().handlers.clear()
 
             # Настройка формата логов
             logging.basicConfig(
@@ -167,24 +174,17 @@ class Mr_Clean:
 
         image = Image.open(icon_path)
 
-        # Создание подменю "О программе"
-        # about_menu = Menu(
-        #     MenuItem("AlexBor", None),
-        #     MenuItem(f"{self.PROGRAM_NAME} v{self.PROGRAM_VERSION}", None)
-        # )
-
-        icon = Icon(
+        self.icon = Icon(
             "Mr. Clean",
             image,
             menu=Menu(
-                MenuItem("Показать", lambda icon, item: self.show_gui(), default=True),  # Пункт "Показать"
-                # MenuItem("О программе", about_menu),  # Выпадающее меню "О программе"
+                MenuItem("Показать", lambda icon, item: self.show_gui(), default=True),
                 MenuItem("О программе", lambda icon, item: os.system(f'start "" "https://github.com/AlexBor-89/Mr_Clean"')),
-                Menu.SEPARATOR,  # Добавление разделителя
-                MenuItem("Выход", lambda icon, item: self.tray_stop_mr_clean(icon, exit_source="manual")),  # Пункт "Выход"
+                Menu.SEPARATOR,
+                MenuItem("Выход", lambda icon, item: self.tray_stop_mr_clean(self.icon, exit_source="manual")),
             ),
         )
-        return icon
+        return self.icon
 
 
     def show_gui(self):
@@ -193,7 +193,7 @@ class Mr_Clean:
         """
         if not self.main_window.IsShown():
             wx.CallAfter(self.main_window.Show, True)  # Показываем окно
-            wx.CallAfter(self.main_window.Raise)       # Поднимаем окно наверх
+            wx.CallAfter(self.main_window.Raise)  # Поднимаем окно наверх
 
             # Если обработчик ещё не добавлен, добавляем его
             if not any(isinstance(h, CustomLogHandler) for h in logging.getLogger().handlers):
@@ -202,7 +202,7 @@ class Mr_Clean:
                 logging.getLogger().addHandler(gui_handler)
 
 
-    def tray_stop_mr_clean(self, icon, exit_source="auto"):
+    def tray_stop_mr_clean(self, icon=None, exit_source="auto"):
         """
         Завершение программы через иконку в трее или после завершения всех процедур.
         
@@ -219,37 +219,43 @@ class Mr_Clean:
             self.logger.warning("Принудительное завершение очистки.")
         else:
             self.logger.info("Очистка завершена.")
-        time.sleep(5)
 
-        try:  # Закрываем главное окно, если оно существует
-            if self.main_window:
-                # Удаляем обработчик логов для GUI
-                for handler in logging.getLogger().handlers:
-                    if isinstance(handler, CustomLogHandler):
-                        logging.getLogger().removeHandler(handler)
-                self.main_window.Destroy()
-        except Exception as e:
-            self.logger.debug(f"Ошибка при закрытии главного окна: {e}")
+        def delayed_shutdown():
+            try:  # Закрываем главное окно, если оно существует
+                if self.main_window:
+                    # Удаляем обработчик логов для GUI
+                    for handler in logging.getLogger().handlers:
+                        if hasattr(handler, "flush"):
+                            handler.flush()
+                        if isinstance(handler, CustomLogHandler):
+                            logging.getLogger().removeHandler(handler)
+                    self.main_window.Destroy()
+            except Exception as e:
+                self.logger.debug(f"Ошибка при закрытии главного окна: {e}")
 
-        try:  # Останавливаем иконку в трее
-            if icon:
-                icon.stop()
-                # self.logger.debug("Иконка остановлена.")
-        except Exception as e:
-            self.logger.debug(f"Ошибка при остановке иконки в трее: {e}")
+            try:  # Останавливаем иконку в трее
+                if icon and icon.visible:
+                    icon.stop()
+                    # self.logger.debug("Иконка остановлена.")
+            except Exception as e:
+                self.logger.debug(f"Ошибка при остановке иконки в трее: {e}")
 
-        try:  # Корректно завершаем MainLoop
-            if self.app and self.app.IsMainLoopRunning():
-                wx.CallAfter(self.app.ExitMainLoop)
-        except Exception as e:
-            self.logger.debug("Ошибка при завершении MainLoop: {e}")
+            try:  # Корректно завершаем MainLoop
+                if self.app and self.app.IsMainLoopRunning():
+                    wx.CallAfter(self.app.ExitMainLoop)
+            except Exception as e:
+                self.logger.debug("Ошибка при завершении MainLoop: {e}")
 
-        # Безопасное завершение программы
-        #if threading.current_thread() is threading.main_thread():
-        if exit_source == "auto":
-            sys.exit()
-        #else:
-        #    os._exit(0)  # Принудительное завершение, если мы не в основном потоке
+            # Безопасное завершение программы
+            if exit_source == "auto":
+                sys.exit()
+
+        # Выполняем shutdown через главный поток с задержкой в 3 секунды
+        if threading.current_thread() is threading.main_thread():  # Через окно (Завершить работу)
+            wx.CallLater(3000, delayed_shutdown)
+        else:  # Через трей (Выход)
+            time.sleep(3)
+            delayed_shutdown()
 
 
     def get_creation_time(self, file_path):  # Функция для получения времени создания файла (кроссплатформенная)
@@ -274,7 +280,7 @@ class Mr_Clean:
 
     def safe_remove(self, path, is_dir=False):
         """
-        Безопасное удаление файла или папки.
+        Метод предназначен для безопасного удаления файлов или каталогов.
         """
         try:
             if is_dir:
@@ -284,16 +290,16 @@ class Mr_Clean:
             self.logger.info(f"Удалён {'каталог' if is_dir else 'файл'}: {path}")
             print(f"Удалён {'каталог' if is_dir else 'файл'}: {path}")  # Вывод в консоль
         except PermissionError as e:
-            self.logger.error(f"Ошибка доступа: {path}. {e}")
+            self.logger.error(f"Ошибка доступа при обработке {path}: {e}")
         except FileNotFoundError:
             self.logger.warning(f"Файл или каталог не найден: {path}")
         except Exception as e:
-            self.logger.error(f"Неизвестная ошибка при удалении {path}: {e}")
+            self.logger.error(f"Ошибка при обработке {path}: {e}")
 
 
     def clean_logs_folder(self):
         """
-        Очистка старых логов.
+        Метод отвечает за очистку старых логов в директории LOGS.
         """
         self.logger.debug(f"Очистка старых логов.")
 
@@ -302,66 +308,160 @@ class Mr_Clean:
         log_folder = base_path / "LOGS"
 
         if not log_folder.exists():
-            self.logger.warning(f"Папка LOGS не найдена. Создание папки {log_folder}.")
+            self.logger.warning(f"Каталог LOGS не найден. Создание каталога: {log_folder}.")
             log_folder.mkdir(exist_ok=True)
         else:
+            # Проверяем права доступа к каталогу LOGS
+            if not os.access(log_folder, os.R_OK | os.W_OK):
+                self.logger.error(f"Недостаточно прав для чтения/записи в каталоге LOGS: {log_folder} — пропускаем очистку.")
+                return
+
             self.logger.info("~ ~ ~ ~ ~ ~ ~ ~ ~ ~")
-            self.logger.info(f"Сканируется папка: {log_folder}. Период хранения: {self.log_days_limit} {get_days_ending(self.log_days_limit)}.")
+            self.logger.info(f"Сканируется каталог: {log_folder}. Период хранения: {self.log_days_limit} {get_days_ending(self.log_days_limit)}.")
 
             date = datetime.datetime.now() - datetime.timedelta(days=self.log_days_limit)
-            for log_file in log_folder.glob("*.log"):
-                creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(log_file))
-                if creation_date < date:
-                    self.safe_remove(log_file)
+
+            for log_file in log_folder.glob("*.log"):  # Проходим по всем файлам в каталоге LOGS
+                try:
+                    # Проверяем права доступа к каждому файлу
+                    if not os.access(log_file, os.R_OK | os.W_OK):
+                        self.logger.warning(f"Файл {log_file} недоступен — пропускаем.")
+                        continue
+
+                    creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(log_file))
+                    if creation_date < date:
+                        self.safe_remove(log_file)
+                except PermissionError as e:
+                    self.logger.error(f"Ошибка доступа при обработке файла {log_file}: {e}")
+                except FileNotFoundError:
+                    self.logger.warning(f"Файл не найден: {log_file}")
+                except Exception as e:
+                    self.logger.error(f"Ошибка при обработке файла {log_file}: {e}")
 
 
     def delete_files_and_folders(self, path, date):  # Метод 0
         """
-        Удаляет файлы и папки с вложенными файлами, если они старше указанного количества дней.
+        Удаляет файлы и каталоги с вложенными файлами, если они старше указанного количества дней.
         """
         time_checker = TimeChecker(self.cycle_time_limit_sec)
         time_checker.start()
 
         try:
-            creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(path))
-            if creation_date < date:
-                self.safe_remove(path, is_dir=True)
-        except Exception as e:
-            self.logger.error(f"Ошибка при обработке папки {path}: {e}")
-        finally:
-            time_checker.stop_event.set()
-            time_checker.join()
-
-    def delete_only_folders(self, path, date):  # Метод 1
-        """
-        Удаляет только папки с вложенными файлами, если они старше указанного количества дней.
-        """
-        time_checker = TimeChecker(self.cycle_time_limit_sec)
-        time_checker.start()
-
-        for root, dirs, _ in os.walk(path):
-            if self.is_forced_exit:
-                return
-    
-            for dir_name in dirs:
+            for root, dirs, files in os.walk(path, topdown=False):
                 if self.is_forced_exit:
                     return
 
                 if time_checker.is_time_up():
-                    self.logger.warning(f"Цикл {path} работает дольше {self.cycle_time_limit_sec} сек. - пропускаем.")
-                    time_checker.stop_event.set()
+                    self.logger.warning(f"Цикл {path} работает дольше {self.cycle_time_limit_sec} сек. — пропускаем.")
+                    break
+
+                if not os.access(root, os.R_OK | os.W_OK):  # Проверяем доступ к текущей директории
+                    self.logger.error(f"Недостаточно прав для чтения/записи в директории: {root} — пропускаем.")
+                    continue
+
+                for file_name in files:  # Обработка файлов
+                    if self.is_forced_exit:
+                        return
+                    
+                    file_path = os.path.join(root, file_name)
+
+                    # Проверяем существование файла и права доступа
+                    if not os.path.exists(file_path) or not os.access(file_path, os.R_OK | os.W_OK):
+                        self.logger.warning(f"Файл {file_path} не существует или недоступен — пропускаем.")
+                        continue
+
+                    try:
+                        creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(file_path))
+                        if creation_date < date:
+                            self.safe_remove(file_path)
+                    except PermissionError as e:
+                        self.logger.error(f"Ошибка доступа при обработке: {file_path}. {e}")
+                    except FileNotFoundError:
+                        self.logger.warning(f"Файл не найден: {file_path}")
+                    except Exception as e:
+                        self.logger.error(f"Ошибка при обработке файла {file_path}: {e}")
+
+                for dir_name in dirs:  # Обработка каталогов
+                    if self.is_forced_exit:
+                        return
+                    
+                    dir_path = os.path.join(root, dir_name)
+
+                    # Проверяем существование каталога и права доступа
+                    if not os.path.exists(dir_path) or not os.access(dir_path, os.R_OK | os.W_OK):
+                        self.logger.warning(f"Каталог {dir_path} не существует или недоступен — пропускаем.")
+                        continue
+
+                    try:
+                        creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(dir_path))
+                        if creation_date < date:
+                            self.safe_remove(dir_path, is_dir=True)
+                    except PermissionError as e:
+                        self.logger.error(f"Ошибка доступа при обработке: {dir_path}. {e}")
+                    except Exception as e:
+                        self.logger.error(f"Ошибка при обработке каталога {dir_path}: {e}")
+
+            # Проверяем сам корневой каталог после обработки его содержимого
+            if os.path.exists(path) and os.access(path, os.R_OK | os.W_OK):
+                creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(path))
+                if creation_date < date:
+                    self.safe_remove(path, is_dir=True)
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при обработке пути {path}: {e}")
+        finally:
+            time_checker.stop_event.set()
+            time_checker.join()
+
+
+    def delete_only_folders(self, path, date):  # Метод 1
+        """
+        Удаляет только каталоги с вложенными файлами, если они старше указанного количества дней.
+        """
+        time_checker = TimeChecker(self.cycle_time_limit_sec)
+        time_checker.start()
+
+        try:
+            for root, dirs, _ in os.walk(path):
+                if self.is_forced_exit:
                     return
+                
+                if not os.access(root, os.R_OK | os.W_OK):  # Проверяем доступ к текущей директории
+                    self.logger.error(f"Недостаточно прав для чтения/записи в директории: {root} — пропускаем.")
+                    continue
 
-                dir_path = os.path.join(root, dir_name)
-                try:
-                    creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(dir_path))
-                    if creation_date < date:
-                        self.safe_remove(dir_path, is_dir=True)
-                except Exception as e:
-                    self.logger.error(f"Ошибка при обработке папки {dir_path}: {e}")
+                for dir_name in dirs:
+                    if self.is_forced_exit:
+                        return
 
-        time_checker.stop_event.set()
-        time_checker.join()
+                    if time_checker.is_time_up():
+                        self.logger.warning(f"Цикл {path} работает дольше {self.cycle_time_limit_sec} сек. — пропускаем.")
+                        time_checker.stop_event.set()
+                        return
+
+                    dir_path = os.path.join(root, dir_name)
+
+                    # Проверяем существование каталога и права доступа
+                    if not os.path.exists(dir_path) or not os.access(dir_path, os.R_OK | os.W_OK):
+                        self.logger.warning(f"Каталог {dir_path} не существует или недоступен — пропускаем.")
+                        continue
+
+                    try:
+                        creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(dir_path))
+                        if creation_date < date:
+                            self.safe_remove(dir_path, is_dir=True)
+                    except Exception as e:
+                        self.logger.error(f"Ошибка при обработке каталога {dir_path}: {e}")
+
+                # Сброс таймера после обработки каждого каталога (опционально)
+                time_checker.reset_timer()
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при обработке пути {path}: {e}")
+        finally:
+            time_checker.stop_event.set()
+            time_checker.join()
+
 
     def delete_only_files(self, path, date, mask_patterns):  # Метод 2
         """
@@ -370,128 +470,181 @@ class Mr_Clean:
         time_checker = TimeChecker(self.cycle_time_limit_sec)
         time_checker.start()
 
-        for root, _, files in os.walk(path):
-            if self.is_forced_exit:
-                return
-    
-            for file_name in files:
+        try:
+            for root, _, files in os.walk(path):
                 if self.is_forced_exit:
                     return
 
-                if time_checker.is_time_up():
-                    self.logger.warning(f"Цикл {path} работает дольше {self.cycle_time_limit_sec} сек. - пропускаем.")
-                    time_checker.stop_event.set()
-                    return
-
-                file_path = os.path.join(root, file_name)
-
-                # Проверяем, соответствует ли файл шаблонам Mask
-                if not any(fnmatch.fnmatch(file_name.lower(), pattern.lower()) for pattern in mask_patterns):
+                if not os.access(root, os.R_OK | os.W_OK):  # Проверяем доступ к текущей директории
+                    self.logger.error(f"Недостаточно прав для чтения/записи в директории: {root} — пропускаем.")
                     continue
-                try:
-                    creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(file_path))
-                    if creation_date < date:
-                        self.safe_remove(file_path)
-                except Exception as e:
-                    self.logger.error(f"Ошибка при обработке файла {file_path}: {e}")
 
-        time_checker.stop_event.set()
-        time_checker.join()
+                for file_name in files:
+                    if self.is_forced_exit:
+                        return
+
+                    if time_checker.is_time_up():
+                        self.logger.warning(f"Цикл {path} работает дольше {self.cycle_time_limit_sec} сек. — пропускаем.")
+                        time_checker.stop_event.set()
+                        return
+
+                    file_path = os.path.join(root, file_name)
+
+                    # Проверяем существование файла и права доступа
+                    if not os.path.exists(file_path) or not os.access(file_path, os.R_OK | os.W_OK):
+                        self.logger.warning(f"Файл {file_path} не существует или недоступен — пропускаем.")
+                        continue
+
+                    # Проверяем, соответствует ли файл шаблонам Mask
+                    if not any(fnmatch.fnmatch(file_name.lower(), pattern.lower()) for pattern in mask_patterns):
+                        continue
+
+                    try:
+                        creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(file_path))
+                        if creation_date < date:
+                            self.safe_remove(file_path)
+                    except PermissionError as e:
+                        self.logger.error(f"Ошибка доступа при обработке файла {file_path}: {e}")
+                    except FileNotFoundError:
+                        self.logger.warning(f"Файл не найден: {file_path}")
+                    except Exception as e:
+                        self.logger.error(f"Ошибка при обработке файла {file_path}: {e}")
+
+                # Сброс таймера после обработки каждого каталога (опционально)
+                time_checker.reset_timer()
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при обработке пути {path}: {e}")
+        finally:
+            time_checker.stop_event.set()
+            time_checker.join()
+
 
     def delete_files_in_subfolders(self, path, date, mask_patterns):  # Метод 3
         """
-        Рекурсивное удаление файлов в подпапках.
+        Рекурсивное удаление файлов в подкаталогах.
         """
-        self.logger.debug(f"Начинается рекурсивное удаление файлов в подпапке: {path}.")
+        self.logger.debug(f"Начинается рекурсивное удаление файлов в подкаталоге: {path}")
         time_checker = TimeChecker(self.cycle_time_limit_sec)
         time_checker.start()
 
-        for item in os.listdir(path):
-            if self.is_forced_exit:
-                return
-            
-            if time_checker.is_time_up():
-                self.logger.warning(f"Цикл {path} работает дольше {self.cycle_time_limit_sec} сек. - пропускаем.")
-                break
+        try:
+            for item in os.listdir(path):
+                if self.is_forced_exit:
+                    return
+                
+                if time_checker.is_time_up():
+                    self.logger.warning(f"Цикл {path} работает дольше {self.cycle_time_limit_sec} сек. — пропускаем.")
+                    break
 
-            item_path = os.path.join(path, item)
+                item_path = os.path.join(path, item)
 
-            if os.path.isdir(item_path):
-                # Сброс таймера перед обработкой нового каталога
-                time_checker.reset_timer()
-                self.logger.info("~ ~ ~ ~ ~ ~ ~ ~ ~ ~")
-                self.logger.info(f"Сканируется подпапка: {item_path}.")
-                self.delete_files_in_subfolders(item_path, date, mask_patterns)
-            elif os.path.isfile(item_path):
-                try:
-                    if time_checker.is_time_up():
-                        self.logger.warning(f"Цикл {path} работает дольше {self.cycle_time_limit_sec} сек. - пропускаем.")
-                        break
+                if not os.access(item_path, os.R_OK | os.W_OK):  # Проверяем права доступа к текущему элементу
+                    self.logger.error(f"Недостаточно прав для чтения/записи в элементе: {item_path} — пропускаем.")
+                    continue
 
-                    creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(item_path))
+                if os.path.isdir(item_path):
+                    # Сброс таймера перед обработкой нового каталога
+                    time_checker.reset_timer()
+                    self.logger.info("~ ~ ~ ~ ~ ~ ~ ~ ~ ~")
+                    self.logger.info(f"Сканируется подкаталог: {item_path}")
+                    self.delete_files_in_subfolders(item_path, date, mask_patterns)
+                elif os.path.isfile(item_path):
+                    try:
+                        if time_checker.is_time_up():
+                            self.logger.warning(f"Цикл {path} работает дольше {self.cycle_time_limit_sec} сек. — пропускаем.")
+                            break
 
-                    # Проверяем, соответствует ли файл шаблонам Mask
-                    if mask_patterns == ["*.*"]:
-                        # Если маска равна "*.*", удаляем все файлы без проверки
-                        if os.path.isfile(item_path):
-                            if creation_date < date:
-                                self.safe_remove(item_path)
-                    else:
-                        # Иначе проверяем соответствие маске
-                        if os.path.isfile(item_path) and mask_patterns and any(fnmatch.fnmatch(os.path.basename(item_path), pattern) for pattern in mask_patterns):
-                            if creation_date < date:
-                                self.safe_remove(item_path)
-                except Exception as e:
-                    self.logger.error(f"Ошибка при обработке файла: {item_path}: {e}")
+                        creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(item_path))
 
-        time_checker.stop_event.set()
-        time_checker.join()
+                        # Проверяем, соответствует ли файл шаблонам Mask
+                        if mask_patterns == ["*.*"]:
+                            # Если маска равна "*.*", удаляем все файлы без проверки
+                            if os.path.isfile(item_path):
+                                if creation_date < date:
+                                    self.safe_remove(item_path)
+                        else:
+                            # Иначе проверяем соответствие маске
+                            if os.path.isfile(item_path) and mask_patterns and any(fnmatch.fnmatch(os.path.basename(item_path), pattern) for pattern in mask_patterns):
+                                if creation_date < date:
+                                    self.safe_remove(item_path)
+                    except PermissionError as e:
+                        self.logger.error(f"Ошибка доступа при обработке файла {item_path}: {e}")
+                    except FileNotFoundError:
+                        self.logger.warning(f"Файл не найден: {item_path}")
+                    except Exception as e:
+                        self.logger.error(f"Ошибка при обработке файла {item_path}: {e}")
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при обработке пути {path}: {e}")
+        finally:
+            time_checker.stop_event.set()
+            time_checker.join()
+
 
     def delete_only_files_in_folder(self, path, date, mask_patterns):  # Метод 4
         """
-        Удаление только файлов в указанной папке, без удаления каталогов.
+        Удаление только файлов в указанном каталоге, без удаления каталогов.
         """
-        self.logger.debug(f"Начинается удаление файлов в папке {path}, сохраняя структуру каталогов.")
+        self.logger.debug(f"Начинается удаление файлов в каталоге {path}, сохраняя структуру каталогов.")
         time_checker = TimeChecker(self.cycle_time_limit_sec)
         time_checker.start()
 
-        for root, _, files in os.walk(path):
-            if self.is_forced_exit:
-                return
-
-            for file_name in files:
+        try:
+            for root, _, files in os.walk(path):
                 if self.is_forced_exit:
                     return
-        
-                if time_checker.is_time_up():
-                    self.logger.warning(f"Цикл {path} работает дольше {self.cycle_time_limit_sec} сек. - пропускаем.")
-                    time_checker.stop_event.set()
-                    return  # Прерываем выполнение, если время истекло
-
-                file_path = os.path.join(root, file_name)
-
-                # Проверяем, соответствует ли файл шаблонам Mask
-                if not any(fnmatch.fnmatch(file_name.lower(), pattern.lower()) for pattern in mask_patterns):
+                
+                if not os.access(root, os.R_OK | os.W_OK):  # Проверяем доступ к текущей директории
+                    self.logger.error(f"Недостаточно прав для чтения/записи в директории: {root} — пропускаем.")
                     continue
 
-                try:
-                    creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(file_path))
-                    if creation_date < date:
-                        self.safe_remove(file_path)
-                except Exception as e:
-                    self.logger.error(f"Ошибка при обработке файла {file_path}: {e}")
+                for file_name in files:
+                    if self.is_forced_exit:
+                        return
+            
+                    if time_checker.is_time_up():
+                        self.logger.warning(f"Цикл {path} работает дольше {self.cycle_time_limit_sec} сек. — пропускаем.")
+                        time_checker.stop_event.set()
+                        return  # Прерываем выполнение, если время истекло
 
-            # Сброс таймера после обработки каждой папки (опционально)
-            time_checker.reset_timer()
+                    file_path = os.path.join(root, file_name)
 
-        # Останавливаем time_checker после завершения
-        time_checker.stop_event.set()
-        time_checker.join()
+                    # Проверяем существование файла и права доступа
+                    if not os.path.exists(file_path) or not os.access(file_path, os.R_OK | os.W_OK):
+                        self.logger.warning(f"Файл {file_path} не существует или недоступен — пропускаем.")
+                        continue
+
+                    # Проверяем, соответствует ли файл шаблонам Mask
+                    if not any(fnmatch.fnmatch(file_name.lower(), pattern.lower()) for pattern in mask_patterns):
+                        continue
+
+                    try:
+                        creation_date = datetime.datetime.fromtimestamp(self.get_creation_time(file_path))
+                        if creation_date < date:
+                            self.safe_remove(file_path)
+                    except PermissionError as e:
+                        self.logger.error(f"Ошибка доступа при обработке файла {file_path}: {e}")
+                    except FileNotFoundError:
+                        self.logger.warning(f"Файл не найден: {file_path}")
+                    except Exception as e:
+                        self.logger.error(f"Ошибка при обработке файла {file_path}: {e}")
+
+                # Сброс таймера после обработки каждого каталога (опционально)
+                time_checker.reset_timer()
+
+        except Exception as e:
+            self.logger.error(f"Ошибка при обработке пути {path}: {e}")
+        finally:
+            # Останавливаем time_checker после завершения
+            time_checker.stop_event.set()
+            time_checker.join()
     
 
     def get_mask_patterns(self, path):
         """
-        Возвращает список шаблонов Mask для заданного пути.
+        Метод возвращает список шаблонов (Mask) для заданного пути из файла конфигурации values.ini.
+        Если шаблоны не указаны, используется значение *.*, что означает удаление всех файлов.
         """
         section = None
         for sec in self.values_config.sections():
@@ -507,16 +660,18 @@ class Mr_Clean:
 
     def start_mr_clean(self):
         """
-        Основной метод для запуска очистки.
+        Метод является основной точкой входа для запуска процесса очистки.
+        Он перебирает все секции файла values.ini, применяет соответствующие методы очистки и логирует результаты.
         """
+        self.logger.info(f"{self.PROGRAM_NAME} v{self.PROGRAM_VERSION}")
         self.logger.debug(f"Основной метод для запуска очистки.")
 
         methods = ["Методы:",
-            "0 - удаляет файлы и папки с вложенными файлами.",
-            "1 - удаляет только папки с вложенными файлами.",
+            "0 - удаляет файлы и каталоги с вложенными файлами.",
+            "1 - удаляет только каталоги с вложенными файлами.",
             "2 - удаляет только файлы по указанному пути.",
-            "3 - удаляет только файлы в подпапках, но не сами подпапки.",
-            "4 - удаляет все файлы в папке и в подпапках, с сохранением структуры папок.",
+            "3 - удаляет только файлы в подкаталогах, но не сами подкаталоги.",
+            "4 - удаляет все файлы в каталоге и в подкаталогах, с сохранением структуры каталогов.",
             "Начало очистки"]
         for method in methods:
             self.logger.info(method)
@@ -535,33 +690,37 @@ class Mr_Clean:
 
             self.logger.info("~ ~ ~ ~ ~ ~ ~ ~ ~ ~")
             if not os.path.exists(path):
-                self.logger.warning(f"Папка {path} не найдена.")
+                self.logger.warning(f"Каталог {path} не найден.")
                 continue
 
             self.logger.info(
-                f"Сканируется папка: {path}." +
+                f"Сканируется каталог: {path}." +
                 f" Метод: {method}." +
                 f" Период хранения: {days} {get_days_ending(days)}." +
                 f" Маска: {", ".join(mask_patterns)}."
             )
-            if method == "0":
-                self.delete_files_and_folders(path, date)
-            elif method == "1":
-                self.delete_only_folders(path, date)
-            elif method == "2":
-                self.delete_only_files(path, date, mask_patterns)
-            elif method == "3":
-                self.delete_files_in_subfolders(path, date, mask_patterns)
-            elif method == "4":
-                self.delete_only_files_in_folder(path, date, mask_patterns)
+
+            try:
+                if method == "0":
+                    self.delete_files_and_folders(path, date)
+                elif method == "1":
+                    self.delete_only_folders(path, date)
+                elif method == "2":
+                    self.delete_only_files(path, date, mask_patterns)
+                elif method == "3":
+                    self.delete_files_in_subfolders(path, date, mask_patterns)
+                elif method == "4":
+                    self.delete_only_files_in_folder(path, date, mask_patterns)
+            except Exception as e:
+                self.logger.error(f"Ошибка при обработке секции {section}: {e}")
         
         # Автоматическое завершение программы после завершения очистки
-        self.tray_stop_mr_clean(None, exit_source="auto")
+        self.tray_stop_mr_clean(self.icon, exit_source="auto")
 
 
     def create_default_configs(self):
         """
-        Создание файлов config.cfg и values.ini с параметрами по умолчанию, если они не существуют в рабочей директории.
+        Метод создаёт файлы конфигурации config.cfg и values.ini с параметрами по умолчанию, если они отсутствуют в рабочей директории.
         """
         # Определение базовой директории
         if hasattr(sys, "_MEIPASS"):
@@ -599,19 +758,19 @@ log-days-limit = 7
             self.logger.info(f"Файл values.ini не найден. Создание файла с параметрами по умолчанию.")
             default_values_content = """\
 # Методы:
-# 0 - удаляет файлы и папки с вложенными файлами.
-# 1 - удаляет только папки с вложенными файлами.
+# 0 - удаляет файлы и каталоги с вложенными файлами.
+# 1 - удаляет только каталоги с вложенными файлами.
 # 2 - удаляет только файлы по указанному пути.
-# 3 - удаляет только файлы в подпапках, но не сами подпапки.
-# 4 - удаляет все файлы в папке и в подпапках, с сохранением структуры папок.
+# 3 - удаляет только файлы в подкаталогах, но не сами подкаталоги.
+# 4 - удаляет все файлы в каталоге и в подкаталогах, с сохранением структуры каталогов.
 
 # Произвольное имя секции
 [Folder Logs]
-# Путь к очищаемой папке
+# Путь к очищаемому каталогу
 Path = "C:\\Logs"
 # Метод удаления
 Method = 2
-# Количество дней, за которые нужно оставить папки и файлы и не удалять их
+# Количество дней, за которые нужно оставить каталоги и файлы и не удалять их
 Days = 7
 # Удаление файлов на основе масок имён и расширений
 Mask = *.log
@@ -640,41 +799,59 @@ class TimeChecker(threading.Thread):
 
 
     def run(self):
+        """
+        Метод является основным методом потока, который постоянно проверяет, не превышено ли заданное время (time_limit).
+        Если время истекло, устанавливается флаг завершения (stop_event).
+        """
         while not self.stop_event.is_set():
             with self.lock:
                 current_time = time.monotonic()
                 if current_time - self.start_time >= self.time_limit:
                     self.stop_event.set()
                     break
-            time.sleep(0.1)  # Интервал проверки
+            time.sleep(0.2)  # Интервал проверки
 
 
     def reset_timer(self):
+        """
+        Метод сбрасывает таймер, обновляя начальное время (start_time) на текущее значение.
+        Это позволяет повторно запустить отсчет времени без необходимости создавать новый экземпляр класса.
+        """
         with self.lock:
             self.start_time = time.monotonic()
 
 
     def is_time_up(self):
+        """
+        Метод проверяет, истекло ли заданное время (time_limit).
+        """
         with self.lock:
             return self.stop_event.is_set()
 
 
     
 class MainWindow(wx.Frame):
-    def __init__(self, parent, title, log_level):
+    def __init__(self, parent, title, log_level, mr_clean_instance):
         super(MainWindow, self).__init__(parent, title=title, size=(800, 600), 
                                          style=wx.DEFAULT_FRAME_STYLE & ~wx.RESIZE_BORDER & ~wx.MAXIMIZE_BOX)
         
+        # Сохраняем ссылку на экземпляр Mr_Clean
+        self.mr_clean = mr_clean_instance
+
         # Создаем панель
         panel = wx.Panel(self)
 
         # Статический текст для заголовка
-        text = wx.StaticText(panel, label="Mr. Clean — это автоматизированная программа для очистки файлов и папок на компьютере.", pos=(15, 10))
+        text = wx.StaticText(panel, label="Mr. Clean — это автоматизированная программа для очистки файлов и каталогов на компьютере.", pos=(15, 10))
         text = wx.StaticText(panel, label=f"Журнал действий (уровень журналирования: {log_level}):", pos=(15, 30))
 
         # Кнопка закрытия
         button_close = wx.Button(panel, label="Закрыть", pos=(700, 530))
         button_close.Bind(wx.EVT_BUTTON, self.on_close)
+
+        # Кнопка завершения работы программы
+        button_close = wx.Button(panel, label="Завершить работу", pos=(10, 530))
+        button_close.Bind(wx.EVT_BUTTON, self.on_shutdown)
 
         # Текстовое поле для вывода логов
         self.log_text = wx.TextCtrl(
@@ -702,17 +879,27 @@ class MainWindow(wx.Frame):
 
     def on_close(self, event):
         """
-        Скрываем окно.
+        Метод скрывает главное окно программы при нажатии кнопки "Закрыть".
+        Это позволяет свернуть программу в системный трей вместо полного закрытия.
         """
         self.Show(False)
 
 
     def on_close_event(self, event):
         """
-        Обработчик события закрытия окна через крестик.
+        Метод обрабатывает событие закрытия окна через крестик в верхнем углу.
+        Вместо закрытия окно просто скрывается, а программа продолжает работать в фоне.
         """
         self.Show(False)  # Просто скрываем окно вместо его уничтожения
         event.Skip(False)  # Останавливаем стандартное поведение (уничтожение окна)
+
+    def on_shutdown(self, event):
+        """
+        Метод вызывается при нажатии кнопки "Завершить работу".
+        Он инициирует принудительное завершение работы программы через вызов соответствующего метода из класса Mr_Clean.
+        """
+        if self.mr_clean:
+            self.mr_clean.tray_stop_mr_clean(self.mr_clean.icon, exit_source="manual")  # Вызываем метод
 
 
 
@@ -723,13 +910,19 @@ class CustomLogHandler(logging.Handler):
 
 
     def emit(self, record):
+        """
+        Метод используется для вывода логов в текстовое поле графического интерфейса.
+        """
         msg = self.format(record)
-        # Обновляем текстовое поле через wx.CallAfter для безопасности
+        # Обновляем текстовое поле через wx.CallAfter
         wx.CallAfter(self.text_ctrl.AppendText, msg + "\n")
 
 
 
 if __name__ == "__main__":
+    # if not ctypes.windll.shell32.IsUserAnAdmin():
+    #     logging.warning("Программа должна быть запущена с правами администратора для полной функциональности.")
+
     # Временный базовый логгер
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
     
@@ -753,12 +946,15 @@ if __name__ == "__main__":
 
         # Ожидаём завершения второго потока (основной очистки)
         thread2.join()
-        if not scraper.is_forced_exit:
+        if scraper.icon and scraper.icon.visible:
             try:  # Останавливаем иконку в трее
                 scraper.icon.stop()  # Останавливаем иконку в трее, если выход не принудительный
             except Exception as e:
-                logging.debug(f"Ошибка при остановке иконки в трее: {e}")
-        thread1.join()
+                logging.debug(f"Ошибка при остановке иконки в трее: {e}")     
+        
+        if not threading.current_thread() is threading.main_thread():
+            thread1.join()
+        
         scraper.logger.debug(f"Завершение программы.")
         os._exit(0)
 
